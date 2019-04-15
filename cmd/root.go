@@ -2,11 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/askmeegs/respy/internal/pkg/requester"
+	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"io/ioutil"
-
-	"github.com/olekukonko/tablewriter"
 	"net/http"
 	"os"
 	"sort"
@@ -15,11 +14,15 @@ import (
 
 var (
 	u          string
+	g          bool
 	concurrent int
 	requests   int
 	resultLock sync.RWMutex
 	client     *http.Client
 	m          map[string]int
+	r          requester.Requester
+	proto      string
+	json       string
 )
 
 var rootCmd = &cobra.Command{
@@ -32,7 +35,7 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&u, "u", "http://numbersapi.com/42", "a valid url, HTTP(S)")
+	rootCmd.PersistentFlags().StringVar(&u, "url", "http://numbersapi.com/42", "a valid HTTPS url or GRPC method")
 	viper.BindPFlag("u", rootCmd.PersistentFlags().Lookup("u"))
 
 	rootCmd.PersistentFlags().IntVar(&requests, "n", 1000, "number of total requests")
@@ -41,7 +44,23 @@ func init() {
 	rootCmd.PersistentFlags().IntVar(&concurrent, "c", 100, "# concurrent requests")
 	viper.BindPFlag("c", rootCmd.PersistentFlags().Lookup("c"))
 
-	client = &http.Client{}
+	// grpc-specific flags
+	rootCmd.PersistentFlags().BoolVar(&g, "grpc", false, "whether to use grpc instead of http")
+	viper.BindPFlag("g", rootCmd.PersistentFlags().Lookup("g"))
+
+	rootCmd.PersistentFlags().StringVar(&proto, "proto", "examples/test.proto", "path to .proto")
+	viper.BindPFlag("proto", rootCmd.PersistentFlags().Lookup("proto"))
+
+	rootCmd.PersistentFlags().StringVar(&json, "json", "examples/search.json", "path to .json grpc")
+	viper.BindPFlag("json", rootCmd.PersistentFlags().Lookup("json"))
+
+	// Initialize requester (HTTP or GRPC)
+	if g {
+		r = requester.NewGrpcRequester(u, proto, json)
+	} else {
+		r = requester.NewHttpRequester(u)
+	}
+
 	m = map[string]int{}
 }
 
@@ -60,7 +79,7 @@ func quit(err error) {
 // 1) Make "n" total requests, "c" concurrently (save responses in a map)
 // 2) print in a table
 func runRespy() {
-	fmt.Printf("☎️   %d requests to %s...\n", requests, u)
+	fmt.Printf("%d requests to %s...\n", requests, u)
 
 	// 1
 	err := makeRequests()
@@ -89,7 +108,7 @@ func makeRequests() error {
 
 func runWorker(n int) {
 	for j := 0; j < n; j++ {
-		res, err := oneRequest()
+		res, err := r.OneRequest() //make a single HTTP or gRPC request
 		if err != nil {
 			fmt.Printf("⚠️ %s", err)
 			continue
@@ -103,31 +122,6 @@ func runWorker(n int) {
 		}
 		resultLock.Unlock()
 	}
-}
-
-// helper for makeRequests
-func oneRequest() (string, error) {
-	req, err := http.NewRequest("GET", u, nil)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("foo", "bar1")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	// resp, err := http.Get(u)
-	// if err != nil {
-	// 	quit(err)
-	// }
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		quit(err)
-	}
-	return string(body), nil
 }
 
 // processes map
