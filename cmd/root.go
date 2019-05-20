@@ -25,7 +25,7 @@ var (
 var rootCmd = &cobra.Command{
 	Use:   "respy",
 	Short: "respy gets responses",
-	Long:  `respy shows the percentage distrubtion for HTTP response text. good 4 istio`,
+	Long:  `respy shows the percentage distrubtion for HTTP response text.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		runRespy()
 	},
