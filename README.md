@@ -76,6 +76,6 @@ Flags:
   -h, --help       help for respy
       --n int      number of total requests (default 1000)
       --u string   a valid url, HTTP(S) (default "http://numbersapi.com/42")
-`` 
+```  
 
 
