@@ -11,5 +11,5 @@ spec:
     spec:
       containers:
       - name: respy
-        image: gcr.io/next19-istio-debug/respy:0.0.1
+        image: gcr.io/mokeefe/respy:v0.0.1
         imagePullPolicy: Always
